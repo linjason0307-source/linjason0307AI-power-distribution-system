@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 綠電智慧配電系統 - 智慧調度儀表板</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN for power dispatch visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #0b1120;
+            color: #f1f5f9;
+        }
+        .font-mono-num {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .dashboard-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.6);
+            border-radius: 1rem;
+        }
+        .glow-emerald {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+        }
+        .glow-amber {
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+    <!-- Navigation Header -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gradient-to-tr from-amber-500 to-emerald-500 rounded-xl text-slate-950 font-extrabold text-xl">
+                    ⚡
+                </div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-black text-white tracking-wide flex items-center gap-2">
+                        AI 綠電智慧配電系統
+                        <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">教育部永續競賽示範版</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">太陽能產能動態最佳化與作息超前調度控制台</p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+                <!-- Real-time Clock Badge -->
+                <div class="flex items-center bg-slate-900 border border-emerald-500/40 rounded-lg px-2.5 py-1.5 text-emerald-400 font-mono-num font-bold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-2"></span>
+                    <span id="liveClockDisplay">2026/09/11 16:26:00</span>
+                </div>
+
+                <!-- Expanded Location Select & GPS Button -->
+                <div class="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-2 py-1">
+                    <button onclick="getUserGPSLocation()" title="GPS 自動定位" class="p-1 hover:bg-slate-700 rounded text-amber-400 font-bold mr-1 flex items-center gap-0.5">
+                        <span>🧭</span>
+                        <span class="text-[10px] hidden sm:inline">GPS 定位</span>
+                    </button>
+                    <select id="citySelect" onchange="onCityChange()" class="bg-transparent text-slate-200 focus:outline-none font-semibold cursor-pointer text-xs">
+                        <option value="Chaozhou_Pingtung" selected>屏東縣 潮州鎮 (當前案場)</option>
+                        <option value="Pingtung">屏東縣 屏東市</option>
+                        <option value="Kaohsiung">高雄市</option>
+                        <option value="Tainan">臺南市</option>
+                        <option value="Chiayi_City">嘉義市</option>
+                        <option value="Chiayi_County">嘉義縣</option>
+                        <option value="Yunlin">雲林縣</option>
+                        <option value="Nantou">南投縣</option>
+                        <option value="Changhua">彰化縣</option>
+                        <option value="Taichung">臺中市</option>
+                        <option value="Miaoli">苗栗縣</option>
+                        <option value="Hsinchu_City">新竹市</option>
+                        <option value="Hsinchu_County">新竹縣</option>
+                        <option value="Taoyuan">桃園市</option>
+                        <option value="NewTaipei">新北市</option>
+                        <option value="Taipei">臺北市</option>
+                        <option value="Keelung">基隆市</option>
+                        <option value="Yilan">宜蘭縣</option>
+                        <option value="Hualien">花蓮縣</option>
+                        <option value="Taitung">臺東縣</option>
+                        <option value="Penghu">澎湖縣</option>
+                        <option value="Kinmen">金門縣</option>
+                        <option value="Matsu">連江縣 (馬祖)</option>
+                    </select>
+                </div>
+
+                <!-- Real-Feel Feedback Button (Enhanced Visibility) -->
+                <button onclick="openRealFeelModal()" class="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 border border-amber-300/60 rounded-lg px-3.5 py-1.5 font-black shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition transform">
+                    <span class="text-base animate-bounce">🌡️</span>
+                    <span>體感數據回報</span>
+                    <span class="bg-slate-950/20 px-1.5 py-0.5 rounded text-[10px] font-extrabold tracking-wider uppercase text-slate-900 border border-amber-900/20">即時校正</span>
+                </button>
+
+                <!-- CWA API Key Button -->
+                <button onclick="openCwaModal()" class="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg px-2.5 py-1.5 font-medium transition">
+                    <span>🔑</span> 氣象署 Key
+                </button>
+
+                <!-- Add Schedule Button -->
+                <button onclick="openScheduleModal()" class="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg px-3 py-1.5 font-bold transition shadow-lg shadow-emerald-500/20">
+                    <span>⏰</span> 新增作息排程
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 pt-6 space-y-6">
+        <!-- AI Smart Alert Banner -->
+        <div id="aiBanner" class="dashboard-card p-4 border-l-4 border-l-emerald-500 bg-gradient-to-r from-emerald-950/30 via-slate-900 to-slate-900 flex flex-wrap md:flex-nowrap justify-between items-center gap-4">
+            <div class="flex items-start gap-3">
+                <div class="p-2.5 bg-emerald-500/20 rounded-xl text-emerald-400 text-2xl animate-pulse">
+                    🧠
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-sm font-bold text-emerald-400 tracking-wider uppercase">AI 綠電超前預測引擎：最佳化策略中</h2>
+                        <span id="realFeelBadge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            🌡️ 已啟用現場微氣候體感修正
+                        </span>
+                    </div>
+                    <p id="aiAdviceText" class="text-sm text-slate-200 mt-0.5 font-medium">
+                        載入氣象資料中...
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 border-t md:border-t-0 md:border-l border-slate-800 pt-2 md:pt-0 md:pl-4 min-w-fit">
+                <div class="text-right">
+                    <div class="text-[11px] text-slate-400 font-medium">預估今日尖峰節省電費</div>
+                    <div id="savedCostText" class="text-lg font-black text-emerald-400 font-mono-num">NT$ 0</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[11px] text-slate-400 font-medium">綠電自發自用率</div>
+                    <div id="selfUseRateText" class="text-lg font-black text-amber-400 font-mono-num">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Left Column: Weather Forecast & Schedule (5 cols) -->
+            <div class="lg:col-span-5 space-y-6">
+
+                <!-- Real-Feel Live Data Status Card (Newly Added Display Column) -->
+                <div id="realFeelDataCard" class="dashboard-card p-4 border border-amber-500/40 bg-amber-950/20 space-y-3">
+                    <div class="flex justify-between items-center border-b border-amber-500/20 pb-2">
+                        <h3 class="text-sm font-bold text-amber-400 flex items-center gap-2">
+                            <span>🌡️</span> 現場微氣候體感回報數據
+                        </h3>
+                        <span id="realFeelStatusBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            未啟用校正 (預設氣象局)
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div class="p-2 bg-slate-900/80 rounded-lg border border-slate-800">
+                            <div class="text-[10px] text-slate-400">體感溫度</div>
+                            <div id="dispRealFeelTemp" class="text-base font-black text-amber-400 font-mono-num mt-0.5">--°C</div>
+                        </div>
+                        <div class="p-2 bg-slate-900/80 rounded-lg border border-slate-800">
+                            <div class="text-[10px] text-slate-400">現場日照</div>
+                            <div id="dispRealFeelSun" class="text-xs font-bold text-slate-200 mt-1">氣象局預報</div>
+                        </div>
+                        <div class="p-2 bg-slate-900/80 rounded-lg border border-slate-800">
+                            <div class="text-[10px] text-slate-400">熱水器限制</div>
+                            <div id="dispWaterHeaterLimit" class="text-xs font-bold text-emerald-400 mt-1">正常運作</div>
+                        </div>
+                    </div>
+                    <div id="realFeelStrategyText" class="text-[11px] text-amber-200/80 bg-slate-900/60 p-2 rounded-lg leading-tight">
+                        💡 點擊右上角「體感數據回報」可即時回報現場微氣候。體感高於 28°C 時，AI 將自動停用熱水器加熱。
+                    </div>
+                </div>
+
+                <!-- Card 1: 7-Day Weather & Solar Prediction -->
+                <section class="dashboard-card p-5 space-y-4">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <span>🌤️</span> 未來 7 天氣象局/OpenData 預報與日照預估
+                        </h3>
+                        <span class="text-[11px] text-slate-400" id="weatherSourceTag">自動介接 API</span>
+                    </div>
+
+                    <!-- Weather Cards Scroll Container -->
+                    <div id="forecastContainer" class="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                        <!-- Dynamic rendered weather cards -->
+                        <div class="p-3 bg-slate-900/60 rounded-lg text-center text-slate-400 text-xs">
+                            ⏳ 正在載入氣象署即時資料...
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-1">
+                        <div class="font-bold text-amber-400 flex items-center gap-1">
+                            💡 智慧調度說明：
+                        </div>
+                        <p class="text-slate-400 leading-relaxed">
+                            當 AI 評估未來 48 小時內降雨機率 &gt; 60% 時，將會於晴天峰值（10:00-14:00）優先驅動熱水器加熱至 70°C 蓄熱，並強制充飽 ESS 儲能電池。
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Card 2: User Schedules & Personal Life Control -->
+                <section class="dashboard-card p-5 space-y-4">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <span>📅</span> 個人生活動態作息與超前調度
+                        </h3>
+                        <button onclick="openScheduleModal()" class="text-xs text-emerald-400 hover:underline font-semibold">+ 新增行程</button>
+                    </div>
+
+                    <!-- Schedule List -->
+                    <div id="scheduleList" class="space-y-2">
+                        <!-- Dynamic list rendering -->
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Right Column: Live Simulation & Distribution Graph (7 cols) -->
+            <div class="lg:col-span-7 space-y-6">
+
+                <!-- Card 3: 24-Hour Time Slider & Live Control -->
+                <section class="dashboard-card p-5 space-y-5">
+                    <div class="flex flex-wrap justify-between items-center border-b border-slate-800 pb-3 gap-2">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                    <span>⚡</span> 24 小時智慧配電模擬與即時狀態
+                                </h3>
+                                <button id="liveSyncBtn" onclick="toggleLiveSync()" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500 text-slate-950 flex items-center gap-1 shadow">
+                                    <span>🔴</span> LIVE 真實時間同步中
+                                </button>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-0.5">系統自動連結確切時間，亦可手動拉動時間軸體驗模擬</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs text-slate-400" id="timeModeTag">當前顯示時間</span>
+                            <div id="currentTimeText" class="text-xl font-black text-amber-400 font-mono-num">16:00 (當前時間)</div>
+                        </div>
+                    </div>
+
+                    <!-- Time Slider Control -->
+                    <div class="space-y-2 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+                        <div class="flex justify-between text-xs text-slate-400 font-mono-num">
+                            <span>00:00 (夜間)</span>
+                            <span>06:00 (日出)</span>
+                            <span>12:00 (正午)</span>
+                            <span>18:00 (日落)</span>
+                            <span>23:00 (深夜)</span>
+                        </div>
+                        <input type="range" id="hourRange" min="0" max="23" value="12" 
+                            class="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div class="relative h-64 w-full pt-2">
+                        <canvas id="dispatchChart"></canvas>
+                    </div>
+
+                    <!-- Live Tiles Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                        <!-- Solar Tile -->
+                        <div class="p-3 bg-slate-900/90 rounded-xl border border-amber-500/30">
+                            <div class="text-[11px] text-slate-400 font-medium flex justify-between">
+                                <span>☀️ 太陽能產能</span>
+                                <span class="text-amber-400 font-bold">即時</span>
+                            </div>
+                            <div id="tileSolarPower" class="text-lg font-black text-amber-400 font-mono-num mt-1">3,600 W</div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">綠電發電峰值</div>
+                        </div>
+
+                        <!-- Hot Water Tile -->
+                        <div class="p-3 bg-slate-900/90 rounded-xl border border-amber-300/30">
+                            <div class="text-[11px] text-slate-400 font-medium flex justify-between">
+                                <span>🚿 熱水器預熱</span>
+                                <span id="tileWaterBadge" class="text-xs font-bold text-amber-300">啟動中</span>
+                            </div>
+                            <div id="tileWaterPower" class="text-lg font-black text-amber-300 font-mono-num mt-1">1,200 W</div>
+                            <div id="tileWaterStatus" class="text-[10px] text-slate-400 mt-0.5">預熱至 65°C</div>
+                        </div>
+
+                        <!-- ESS Battery Tile -->
+                        <div class="p-3 bg-slate-900/90 rounded-xl border border-emerald-500/30">
+                            <div class="text-[11px] text-slate-400 font-medium flex justify-between">
+                                <span>🔋 儲能電池 (ESS)</span>
+                                <span id="tileBatterySoC" class="text-xs font-bold text-emerald-400 font-mono-num">85%</span>
+                            </div>
+                            <div id="tileBatteryPower" class="text-lg font-black text-emerald-400 font-mono-num mt-1">+1,500 W</div>
+                            <div id="tileBatteryStatus" class="text-[10px] text-slate-400 mt-0.5">綠電充飽備用中</div>
+                        </div>
+
+                        <!-- EV Charger Tile -->
+                        <div class="p-3 bg-slate-900/90 rounded-xl border border-blue-500/30">
+                            <div class="text-[11px] text-slate-400 font-medium flex justify-between">
+                                <span>🚗 電動車慢充</span>
+                                <span id="tileEvBadge" class="text-xs font-bold text-slate-500">待機</span>
+                            </div>
+                            <div id="tileEvPower" class="text-lg font-black text-blue-400 font-mono-num mt-1">0 W</div>
+                            <div id="tileEvStatus" class="text-[10px] text-slate-400 mt-0.5">排程等待中</div>
+                        </div>
+                    </div>
+
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal 1: 新增行程 Modal -->
+    <div id="scheduleModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="dashboard-card max-w-md w-full p-6 space-y-4 border border-emerald-500/40 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <span>⏰</span> 新增生活作息與預熱排程
+                </h3>
+                <button onclick="closeScheduleModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+            </div>
+
+            <form onsubmit="saveNewSchedule(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">行程名稱</label>
+                    <input type="text" id="schedTitle" placeholder="例如：晚上到家洗澡" required
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">預計作息時間</label>
+                        <select id="schedTargetHour" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono-num">
+                            <option value="17">17:00</option>
+                            <option value="18">18:00</option>
+                            <option value="19" selected>19:00</option>
+                            <option value="20">20:00</option>
+                            <option value="21">21:00</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">AI 提前啟動時間</label>
+                        <select id="schedStartHour" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono-num">
+                            <option value="11">11:00 (正午綠電)</option>
+                            <option value="12">12:00 (發電峰值)</option>
+                            <option value="13">13:00</option>
+                            <option value="14">14:00</option>
+                            <option value="15">15:00</option>
+                            <option value="16">16:00</option>
+                            <option value="17">17:00</option>
+                            <option value="18" selected>18:00</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">調度目標設備</label>
+                        <select id="schedDevice" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500">
+                            <option value="water" selected>🚿 太陽能熱水器預熱</option>
+                            <option value="ac">❄️ 冷氣/除濕機預冷</option>
+                            <option value="ev">🚗 電動車慢充</option>
+                            <option value="battery">🔋 儲能電池預充</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-semibold mb-1">預估功率 (W)</label>
+                        <input type="number" id="schedPower" value="1200" min="100" max="3000" step="100" required
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono-num">
+                    </div>
+                </div>
+
+                <div class="pt-3 flex justify-end gap-2">
+                    <button type="button" onclick="closeScheduleModal()" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold">取消</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400">建立排程</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: 現場體感數據 Modal -->
+    <div id="realFeelModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="dashboard-card max-w-md w-full p-6 space-y-4 border border-amber-500/40 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <span>🌡️</span> 現場體感微氣候即時回報
+                </h3>
+                <button onclick="closeRealFeelModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+            </div>
+
+            <form onsubmit="saveRealFeel(event)" class="space-y-4 text-xs">
+                <div>
+                    <div class="flex justify-between text-slate-300 font-semibold mb-1">
+                        <label>現場體感溫度</label>
+                        <span id="realFeelTempVal" class="text-amber-400 font-mono-num font-bold">32°C</span>
+                    </div>
+                    <input type="range" id="realFeelTempInput" min="15" max="42" value="32" 
+                        oninput="document.getElementById('realFeelTempVal').innerText = this.value + '°C'"
+                        class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">現場實際日照感受</label>
+                    <select id="realFeelSunInput" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-amber-500">
+                        <option value="sunny">☀️ 烈日當頭 (發電比預報多 +20%)</option>
+                        <option value="normal" selected>⛅ 正常符合預報</option>
+                        <option value="cloudy">☁️ 雲層偶爾遮蔽 (發電略減 -30%)</option>
+                        <option value="rainy">🌧️ 突發局部陣雨 (發電銳減 -70%)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">體感舒適度 / 空調需求</label>
+                    <select id="realFeelComfortInput" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-amber-500">
+                        <option value="hot" selected>🥵 酷熱難耐 (AI 自動提高冷氣預冷功率)</option>
+                        <option value="comfy">😊 體感舒適 (正常運作)</option>
+                        <option value="cool">🥶 偏涼 (減少預冷功率)</option>
+                    </select>
+                </div>
+
+                <div class="pt-2 flex justify-between items-center">
+                    <button type="button" onclick="clearRealFeel()" class="text-slate-400 hover:text-slate-200 underline">清除體感校正</button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeRealFeelModal()" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-semibold">取消</button>
+                        <button type="submit" class="px-4 py-2 rounded-lg bg-amber-500 text-slate-950 font-bold hover:bg-amber-400">送出校正</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: CWA API Key Modal -->
+    <div id="cwaModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="dashboard-card max-w-md w-full p-6 space-y-4 border border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <span>🔑</span> 設定中央氣象署 (CWA) API Key
+                </h3>
+                <button onclick="closeCwaModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <p class="text-slate-300 leading-relaxed">
+                    本系統預設會自動透過開放 Open-Meteo 高解析度臺灣氣象 API 取得未來 7 天降雨與太陽輻射數據。若您擁有氣象署開放資料 API Key，可於此輸入：
+                </p>
+                <input type="text" id="cwaKeyInput" placeholder="CWA-XXXXX-XXXXXX" 
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-emerald-500 font-mono-num">
+                
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeCwaModal()" class="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 font-semibold">取消</button>
+                    <button type="button" onclick="saveCwaKey()" class="px-4 py-2 rounded-lg bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400">儲存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Controller -->
+    <script>
+        // Taiwan Expanded Locations Coordinates Database
+        const cityLocations = {
+            'Chaozhou_Pingtung': { name: '屏東縣 潮州鎮', lat: 22.550, lon: 120.542 },
+            'Pingtung': { name: '屏東縣 屏東市', lat: 22.671, lon: 120.488 },
+            'Kaohsiung': { name: '高雄市', lat: 22.627, lon: 120.301 },
+            'Tainan': { name: '臺南市', lat: 22.999, lon: 120.226 },
+            'Chiayi_City': { name: '嘉義市', lat: 23.480, lon: 120.449 },
+            'Chiayi_County': { name: '嘉義縣', lat: 23.458, lon: 120.292 },
+            'Yunlin': { name: '雲林縣', lat: 23.709, lon: 120.431 },
+            'Nantou': { name: '南投縣', lat: 23.903, lon: 120.686 },
+            'Changhua': { name: '彰化縣', lat: 24.081, lon: 120.538 },
+            'Taichung': { name: '臺中市', lat: 24.147, lon: 120.673 },
+            'Miaoli': { name: '苗栗縣', lat: 24.560, lon: 120.821 },
+            'Hsinchu_City': { name: '新竹市', lat: 24.814, lon: 120.968 },
+            'Hsinchu_County': { name: '新竹縣', lat: 24.838, lon: 121.018 },
+            'Taoyuan': { name: '桃園市', lat: 24.993, lon: 121.301 },
+            'NewTaipei': { name: '新北市', lat: 25.012, lon: 121.465 },
+            'Taipei': { name: '臺北市', lat: 25.038, lon: 121.564 },
+            'Keelung': { name: '基隆市', lat: 25.128, lon: 121.742 },
+            'Yilan': { name: '宜蘭縣', lat: 24.757, lon: 121.753 },
+            'Hualien': { name: '花蓮縣', lat: 23.987, lon: 121.601 },
+            'Taitung': { name: '臺東縣', lat: 22.758, lon: 121.144 },
+            'Penghu': { name: '澎湖縣', lat: 23.571, lon: 119.579 },
+            'Kinmen': { name: '金門縣', lat: 24.449, lon: 118.376 },
+            'Matsu': { name: '連江縣 (馬祖)', lat: 26.158, lon: 119.951 }
+        };
+
+        // State Variables
+        let isLiveTimeMode = true;
+        let customGpsLocation = null;
+        let cwaApiKey = '';
+        let dispatchChart = null;
+
+        let daysOfWeek = [];
+        let selectedDayIndex = 0;
+
+        let schedules = [
+            { id: 1, title: '晚上到家洗澡', targetHour: 19, startHour: 18, device: 'water', power: 1200, active: true },
+            { id: 2, title: '夜間電動車慢充', targetHour: 23, startHour: 22, device: 'ev', power: 2000, active: true },
+            { id: 3, title: '下午冷氣預冷', targetHour: 17, startHour: 15, device: 'ac', power: 900, active: true }
+        ];
+
+        let realFeelData = {
+            temp: 32,
+            sun: 'normal',
+            comfort: 'hot',
+            active: false
+        };
+
+        function initChart() {
+            try {
+                const canvas = document.getElementById('dispatchChart');
+                if (!canvas) return;
+
+                if (typeof Chart === 'undefined') {
+                    console.warn('Chart.js Library is loading, retrying initialization...');
+                    setTimeout(initChart, 300);
+                    return;
+                }
+
+                const ctx = canvas.getContext('2d');
+                if (dispatchChart) {
+                    dispatchChart.destroy();
+                }
+
+                dispatchChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`),
+                        datasets: [
+                            {
+                                label: '太陽能發電 (W)',
+                                data: Array(24).fill(0),
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: '總用電負載 (W)',
+                                data: Array(24).fill(0),
+                                borderColor: '#38bdf8',
+                                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: '儲能 SOC (%)',
+                                data: Array(24).fill(0),
+                                borderColor: '#10b981',
+                                borderDash: [5, 5],
+                                fill: false,
+                                yAxisID: 'y1',
+                                tension: 0.3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { labels: { color: '#94a3b8', font: { family: 'Noto Sans TC', size: 11 } } }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                                ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } }
+                            },
+                            y: {
+                                title: { display: true, text: '功率 (W)', color: '#94a3b8', font: { size: 10 } },
+                                grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                                ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } },
+                                min: 0,
+                                suggestedMax: 4500
+                            },
+                            y1: {
+                                position: 'right',
+                                title: { display: true, text: '電池電量 (%)', color: '#10b981', font: { size: 10 } },
+                                grid: { drawOnChartArea: false },
+                                ticks: { color: '#10b981', font: { family: 'JetBrains Mono', size: 10 } },
+                                min: 0,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error('Error in initChart:', err);
+            }
+        }
+
+        function startRealTimeClock() {
+            function updateClock() {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const date = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+
+                const clockEl = document.getElementById('liveClockDisplay');
+                if (clockEl) {
+                    clockEl.innerText = `${year}/${month}/${date} ${hours}:${minutes}:${seconds}`;
+                }
+
+                if (isLiveTimeMode) {
+                    const currentHour = now.getHours();
+                    const slider = document.getElementById('hourRange');
+                    if (slider && parseInt(slider.value) !== currentHour) {
+                        slider.value = currentHour;
+                        updateHourDisplay(currentHour, true);
+                        runSimulation();
+                    }
+                }
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        function toggleLiveSync(forceStatus = null) {
+            isLiveTimeMode = forceStatus !== null ? forceStatus : !isLiveTimeMode;
+            const btn = document.getElementById('liveSyncBtn');
+            const modeTag = document.getElementById('timeModeTag');
+
+            if (isLiveTimeMode) {
+                if (btn) {
+                    btn.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500 text-slate-950 flex items-center gap-1 shadow';
+                    btn.innerHTML = '<span>🔴</span> LIVE 真實時間同步中';
+                }
+                if (modeTag) modeTag.innerText = '當前真實時間';
+                const currentHour = new Date().getHours();
+                const slider = document.getElementById('hourRange');
+                if (slider) slider.value = currentHour;
+                updateHourDisplay(currentHour, true);
+                runSimulation();
+            } else {
+                if (btn) {
+                    btn.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1';
+                    btn.innerHTML = '<span>⚙️</span> 手動模擬模式 (點擊切回 LIVE)';
+                }
+                if (modeTag) modeTag.innerText = '手動模擬時間';
+            }
+        }
+
+        function updateHourDisplay(hour, isLive = false) {
+            const hStr = String(hour).padStart(2, '0');
+            let statusText = '';
+            if (hour >= 10 && hour <= 14) statusText = '(發電最高峰)';
+            else if (hour >= 6 && hour < 10) statusText = '(日照提升中)';
+            else if (hour > 14 && hour <= 18) statusText = '(午後發電逐漸下降)';
+            else statusText = '(夜間/儲能供電中)';
+
+            const el = document.getElementById('currentTimeText');
+            if (el) {
+                el.innerText = `${hStr}:00 ${isLive ? '[即時]' : ''} ${statusText}`;
+            }
+        }
+
+        function getUserGPSLocation() {
+            const tag = document.getElementById('weatherSourceTag');
+            if (navigator.geolocation) {
+                if (tag) tag.innerText = '⏳ 正在獲取您的 GPS 定位...';
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        customGpsLocation = {
+                            name: `📍 GPS 定位點 (${lat.toFixed(2)}, ${lon.toFixed(2)})`,
+                            lat: lat,
+                            lon: lon
+                        };
+                        if (tag) tag.innerText = `🟢 已定位至您的經緯度 (${lat.toFixed(2)}, ${lon.toFixed(2)})`;
+                        fetchRealWeather();
+                    },
+                    (error) => {
+                        console.warn('GPS 定位失敗:', error);
+                        if (tag) tag.innerText = '⚠️ GPS 定位失敗，使用選單地區';
+                        alert('無法取得您的 GPS 位置，已自動為您切換至選單預設地區。');
+                    }
+                );
+            } else {
+                alert('您的瀏覽器不支援 GPS 地理定位功能。');
+            }
+        }
+
+        async function fetchRealWeather() {
+            let loc = customGpsLocation || cityLocations[document.getElementById('citySelect').value] || cityLocations['Chaozhou_Pingtung'];
+            const tag = document.getElementById('weatherSourceTag');
+            if (tag) tag.innerText = '⏳ 連線氣象站 API...';
+
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&daily=weathercode,temperature_2m_max,precipitation_probability_max,shortwave_radiation_sum&timezone=Asia%2FTaipei`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data && data.daily) {
+                    const weekdayNames = ['日', '一', '二', '三', '四', '五', '六'];
+                    
+                    daysOfWeek = data.daily.time.slice(0, 7).map((tStr, idx) => {
+                        const d = new Date(tStr);
+                        const month = d.getMonth() + 1;
+                        const dateNum = d.getDate();
+                        const dayName = weekdayNames[d.getDay()];
+
+                        const code = data.daily.weathercode[idx];
+                        const rainProb = (data.daily.precipitation_probability_max[idx] || 0);
+                        const maxTemp = Math.round(data.daily.temperature_2m_max[idx]);
+                        
+                        let wType = 'sunny';
+                        if (code >= 50 || rainProb > 60) wType = 'rainy';
+                        else if (code >= 1 || rainProb > 30) wType = 'cloudy';
+
+                        const rad = data.daily.shortwave_radiation_sum[idx] || 20;
+                        const basePower = Math.min(4500, Math.max(800, Math.round(rad * 150)));
+
+                        let dayLabel = `${month}/${dateNum} (${dayName})`;
+                        if (idx === 0) dayLabel = `${month}/${dateNum} (${dayName}/今天)`;
+
+                        return {
+                            day: dayLabel,
+                            weather: wType,
+                            baseSolar: basePower,
+                            temp: `${maxTemp}°C`,
+                            rainProb: `${rainProb}%`
+                        };
+                    });
+                    if (tag) tag.innerText = `🟢 已連線 ${loc.name} 氣象 API`;
+                }
+            } catch (err) {
+                console.warn('API 連線失敗，切換至備用預測:', err);
+                if (tag) tag.innerText = '🟡 離線模式';
+                daysOfWeek = [
+                    { day: '今天', weather: 'sunny', baseSolar: 3800, temp: '32°C', rainProb: '10%' },
+                    { day: '明天', weather: 'cloudy', baseSolar: 2400, temp: '29°C', rainProb: '40%' },
+                    { day: '後天', weather: 'rainy', baseSolar: 900, temp: '26°C', rainProb: '85%' },
+                    { day: '第 4 天', weather: 'rainy', baseSolar: 1100, temp: '27°C', rainProb: '70%' },
+                    { day: '第 5 天', weather: 'sunny', baseSolar: 4000, temp: '33°C', rainProb: '15%' },
+                    { day: '第 6 天', weather: 'sunny', baseSolar: 4200, temp: '34°C', rainProb: '0%' },
+                    { day: '第 7 天', weather: 'cloudy', baseSolar: 2800, temp: '30°C', rainProb: '30%' }
+                ];
+            }
+
+            render7DayForecast();
+            runSimulation();
+        }
+
+        function onCityChange() {
+            customGpsLocation = null;
+            fetchRealWeather();
+        }
+
+        function render7DayForecast() {
+            const container = document.getElementById('forecastContainer');
+            if (!container || !daysOfWeek.length) return;
+
+            let html = '';
+            daysOfWeek.forEach((d, idx) => {
+                const isSelected = idx === selectedDayIndex;
+                let icon = '☀️';
+                let bgStyle = 'bg-amber-500/10 border-amber-500/30';
+
+                if (d.weather === 'rainy') {
+                    icon = '🌧️';
+                    bgStyle = 'bg-blue-500/10 border-blue-500/30';
+                } else if (d.weather === 'cloudy') {
+                    icon = '⛅';
+                    bgStyle = 'bg-slate-800 border-slate-700';
+                }
+
+                html += `
+                    <div onclick="selectForecastDay(${idx})" class="p-3 rounded-xl border ${bgStyle} ${isSelected ? 'ring-2 ring-emerald-400 bg-slate-800/90' : 'opacity-80 hover:opacity-100'} cursor-pointer transition flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xl">${icon}</span>
+                            <div>
+                                <div class="font-bold text-xs text-white">${d.day}</div>
+                                <div class="text-[10px] text-slate-400">降雨機率: <span class="font-mono-num text-slate-300">${d.rainProb}</span></div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs font-black text-amber-400 font-mono-num">${d.baseSolar} W</div>
+                            <div class="text-[10px] text-slate-400 font-mono-num">${d.temp}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function selectForecastDay(idx) {
+            selectedDayIndex = idx;
+            render7DayForecast();
+            runSimulation();
+        }
+
+        function renderScheduleList() {
+            const container = document.getElementById('scheduleList');
+            if (!container) return;
+
+            if (schedules.length === 0) {
+                container.innerHTML = `<div class="p-4 bg-slate-900/40 rounded-xl text-center text-slate-500 text-xs">目前無行程，請點擊「新增行程」加入作息。</div>`;
+                return;
+            }
+
+            let html = '';
+            schedules.forEach((s) => {
+                let deviceIcon = '🚿';
+                if (s.device === 'ac') deviceIcon = '❄️';
+                if (s.device === 'ev') deviceIcon = '🚗';
+                if (s.device === 'battery') deviceIcon = '🔋';
+
+                html += `
+                    <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <input type="checkbox" ${s.active ? 'checked' : ''} onchange="toggleSchedule(${s.id})" class="w-4 h-4 accent-emerald-500 rounded cursor-pointer">
+                            <div>
+                                <div class="font-bold text-xs text-slate-200 flex items-center gap-1.5">
+                                    <span>${deviceIcon}</span> ${s.title}
+                                </div>
+                                <div class="text-[10px] text-slate-400 font-mono-num">
+                                    作息: ${s.targetHour}:00 | AI 提前預熱: <span class="text-emerald-400 font-bold">${s.startHour}:00</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-amber-400 font-mono-num">${s.power} W</span>
+                            <button onclick="deleteSchedule(${s.id})" class="text-slate-500 hover:text-red-400 font-bold px-1">✕</button>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleSchedule(id) {
+            const s = schedules.find(item => item.id === id);
+            if (s) s.active = !s.active;
+            renderScheduleList();
+            runSimulation();
+        }
+
+        function deleteSchedule(id) {
+            schedules = schedules.filter(item => item.id !== id);
+            renderScheduleList();
+            runSimulation();
+        }
+
+        function runSimulation() {
+            if (!daysOfWeek.length) return;
+
+            const selectedDay = daysOfWeek[selectedDayIndex] || daysOfWeek[0];
+            const hourRangeEl = document.getElementById('hourRange');
+            const currentHour = hourRangeEl ? parseInt(hourRangeEl.value) : 12;
+
+            // Check if upcoming rainy days are predicted (next 2 days rainProb > 50%)
+            let upcomingRain = false;
+            for (let i = 1; i <= 2; i++) {
+                if (daysOfWeek[i] && (daysOfWeek[i].weather === 'rainy' || parseInt(daysOfWeek[i].rainProb) > 50)) {
+                    upcomingRain = true;
+                    break;
+                }
+            }
+
+            // Real-feel modifier
+            let realFeelMult = 1.0;
+            const isHighTempCutoff = realFeelData.active && realFeelData.temp > 28;
+
+            if (realFeelData.active) {
+                if (realFeelData.sun === 'sunny') realFeelMult = 1.2;
+                if (realFeelData.sun === 'cloudy') realFeelMult = 0.7;
+                if (realFeelData.sun === 'rainy') realFeelMult = 0.3;
+            }
+
+            // Update Real-Feel Dedicated Display Column UI
+            const dispTemp = document.getElementById('dispRealFeelTemp');
+            const dispSun = document.getElementById('dispRealFeelSun');
+            const dispWaterLimit = document.getElementById('dispWaterHeaterLimit');
+            const dispBadge = document.getElementById('realFeelStatusBadge');
+            const dispStratText = document.getElementById('realFeelStrategyText');
+
+            if (realFeelData.active) {
+                if (dispTemp) dispTemp.innerText = `${realFeelData.temp}°C`;
+                
+                let sunText = '⛅ 正常';
+                if (realFeelData.sun === 'sunny') sunText = '☀️ 烈日';
+                if (realFeelData.sun === 'cloudy') sunText = '☁️ 雲遮';
+                if (realFeelData.sun === 'rainy') sunText = '🌧️ 陣雨';
+                if (dispSun) dispSun.innerText = sunText;
+
+                if (isHighTempCutoff) {
+                    if (dispWaterLimit) {
+                        dispWaterLimit.innerText = '⛔ 暫停加熱';
+                        dispWaterLimit.className = 'text-xs font-bold text-red-400 mt-1';
+                    }
+                    if (dispStratText) dispStratText.innerHTML = `⚠️ <b>體感 ${realFeelData.temp}°C (&gt; 28°C)</b>：AI 已自動限制熱水器運作以節省綠電，轉投儲能與冷氣預冷。`;
+                } else {
+                    if (dispWaterLimit) {
+                        dispWaterLimit.innerText = '✅ 正常加熱';
+                        dispWaterLimit.className = 'text-xs font-bold text-emerald-400 mt-1';
+                    }
+                    if (dispStratText) dispStratText.innerHTML = `✅ 體感 ${realFeelData.temp}°C (≤ 28°C)：熱水器與綠電調度正常執行。`;
+                }
+
+                if (dispBadge) {
+                    dispBadge.innerText = '🟢 已啟用即時微氣候校正';
+                    dispBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+                }
+            } else {
+                if (dispTemp) dispTemp.innerText = '--°C';
+                if (dispSun) dispSun.innerText = '預設預報';
+                if (dispWaterLimit) {
+                    dispWaterLimit.innerText = '正常運作';
+                    dispWaterLimit.className = 'text-xs font-bold text-emerald-400 mt-1';
+                }
+                if (dispBadge) {
+                    dispBadge.innerText = '未啟用校正 (預設氣象局)';
+                    dispBadge.className = 'text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40';
+                }
+                if (dispStratText) dispStratText.innerHTML = '💡 點擊右上角「體感數據回報」可即時回報現場微氣候。體感高於 28°C 時，AI 將自動停用熱水器加熱。';
+            }
+
+            const solarCurve = [];
+            const loadCurve = [];
+            const socCurve = [];
+
+            let currentSoc = 30; // Starting battery SoC %
+
+            for (let h = 0; h < 24; h++) {
+                // Calculate Solar curve
+                let hourPower = 0;
+                if (h >= 6 && h <= 18) {
+                    const sinVal = Math.sin(((h - 6) / 12) * Math.PI);
+                    hourPower = Math.round(selectedDay.baseSolar * sinVal * realFeelMult);
+                }
+
+                // Base household load (standby ~300W)
+                let hourLoad = 300;
+
+                // Check Active Schedules
+                schedules.filter(s => s.active).forEach(s => {
+                    if (h >= s.startHour && h <= s.targetHour) {
+                        let p = s.power;
+                        
+                        // Rule: If real feel temp > 28°C, disable water heater pre-heating
+                        if (s.device === 'water' && isHighTempCutoff) {
+                            p = 0;
+                        }
+
+                        if (realFeelData.active && realFeelData.comfort === 'hot' && s.device === 'ac') {
+                            p = Math.round(p * 1.3); // AC boost
+                        }
+                        hourLoad += p;
+                    }
+                });
+
+                // AI Adaptive Logic: Rainy upcoming -> pre-charge ESS battery at peak hours
+                if (upcomingRain && selectedDay.weather === 'sunny' && h >= 10 && h <= 14) {
+                    hourLoad += 800; // Force pre-heating and pre-charging
+                }
+
+                // Battery SoC simulation
+                const netPower = hourPower - hourLoad;
+                if (netPower > 0) {
+                    currentSoc = Math.min(100, currentSoc + (netPower / 3000) * 15);
+                } else {
+                    currentSoc = Math.max(10, currentSoc + (netPower / 3000) * 10);
+                }
+
+                solarCurve.push(hourPower);
+                loadCurve.push(hourLoad);
+                socCurve.push(Math.round(currentSoc));
+            }
+
+            // Update Chart if available
+            if (dispatchChart && dispatchChart.data) {
+                dispatchChart.data.datasets[0].data = solarCurve;
+                dispatchChart.data.datasets[1].data = loadCurve;
+                dispatchChart.data.datasets[2].data = socCurve;
+                dispatchChart.update();
+            }
+
+            // Update Tile metrics for current selected hour
+            const curSolar = solarCurve[currentHour];
+            const curLoad = loadCurve[currentHour];
+            const curSoc = socCurve[currentHour];
+
+            const solarTile = document.getElementById('tileSolarPower');
+            const batterySocTile = document.getElementById('tileBatterySoC');
+
+            if (solarTile) solarTile.innerText = `${curSolar.toLocaleString()} W`;
+            if (batterySocTile) batterySocTile.innerText = `${curSoc}%`;
+
+            // Active water heater power
+            const waterSched = schedules.find(s => s.active && s.device === 'water' && currentHour >= s.startHour && currentHour <= s.targetHour);
+            const waterPowerTile = document.getElementById('tileWaterPower');
+            const waterBadgeTile = document.getElementById('tileWaterBadge');
+            const waterStatusTile = document.getElementById('tileWaterStatus');
+
+            if (isHighTempCutoff) {
+                if (waterPowerTile) waterPowerTile.innerText = '0 W';
+                if (waterBadgeTile) {
+                    waterBadgeTile.innerText = '體感>28°C 關閉';
+                    waterBadgeTile.className = 'text-xs font-bold text-red-400';
+                }
+                if (waterStatusTile) waterStatusTile.innerText = '體感過熱暫停加熱';
+            } else if (waterSched) {
+                if (waterPowerTile) waterPowerTile.innerText = `${waterSched.power} W`;
+                if (waterBadgeTile) {
+                    waterBadgeTile.innerText = '超前預熱中';
+                    waterBadgeTile.className = 'text-xs font-bold text-amber-300 animate-pulse';
+                }
+                if (waterStatusTile) waterStatusTile.innerText = `作息到家時間: ${waterSched.targetHour}:00`;
+            } else {
+                if (waterPowerTile) waterPowerTile.innerText = '0 W';
+                if (waterBadgeTile) {
+                    waterBadgeTile.innerText = '待機';
+                    waterBadgeTile.className = 'text-xs font-bold text-slate-500';
+                }
+                if (waterStatusTile) waterStatusTile.innerText = '排程待機中';
+            }
+
+            // EV tile
+            const evSched = schedules.find(s => s.active && s.device === 'ev' && currentHour >= s.startHour && currentHour <= s.targetHour);
+            const evPowerTile = document.getElementById('tileEvPower');
+            const evBadgeTile = document.getElementById('tileEvBadge');
+
+            if (evSched) {
+                if (evPowerTile) evPowerTile.innerText = `${evSched.power} W`;
+                if (evBadgeTile) {
+                    evBadgeTile.innerText = '充電中';
+                    evBadgeTile.className = 'text-xs font-bold text-blue-400';
+                }
+            } else {
+                if (evPowerTile) evPowerTile.innerText = '0 W';
+                if (evBadgeTile) {
+                    evBadgeTile.innerText = '待機';
+                    evBadgeTile.className = 'text-xs font-bold text-slate-500';
+                }
+            }
+
+            // ESS Battery tile status
+            const batPowerTile = document.getElementById('tileBatteryPower');
+            const batStatusTile = document.getElementById('tileBatteryStatus');
+
+            if (curSolar > curLoad) {
+                if (batPowerTile) batPowerTile.innerText = `+${Math.round(curSolar - curLoad)} W`;
+                if (batStatusTile) batStatusTile.innerText = '綠電充飽備用中';
+            } else {
+                if (batPowerTile) batPowerTile.innerText = `-${Math.round(curLoad - curSolar)} W`;
+                if (batStatusTile) batStatusTile.innerText = '放電支應家電';
+            }
+
+            // Dynamic AI Banner text
+            const adviceEl = document.getElementById('aiAdviceText');
+            if (adviceEl) {
+                if (isHighTempCutoff) {
+                    adviceEl.innerHTML = `<span class="text-red-400 font-bold">⛔ 體感高於 28°C 告警：</span> 現場體感為 ${realFeelData.temp}°C，AI 已自動關閉熱水器預熱，避免無效加熱耗電！`;
+                } else if (upcomingRain) {
+                    adviceEl.innerHTML = `<span class="text-amber-400 font-bold">⚠️ 偵測到未來 48 小時內降雨機率過高！</span> AI 已於今日光照最佳時段開啟 [熱水器蓄熱 70°C + ESS 電池 100% 充飽] 預防性策略。`;
+                } else if (realFeelData.active) {
+                    adviceEl.innerHTML = `<span class="text-amber-300 font-bold">🌡️ 現場微氣候校正生效中：</span> 當前體感 ${realFeelData.temp}°C，AI 已自動微調發電預測與空調冷氣預冷排程。`;
+                } else {
+                    adviceEl.innerHTML = `<span class="text-emerald-400 font-bold">✅ 電力系統最佳運作中：</span> 今日綠電產能充足，AI 動態滿足個人生活作息預熱，無須向台電購買高價尖峰電力。`;
+                }
+            }
+
+            // Calculate estimated savings
+            const totalSolarKwh = (solarCurve.reduce((a, b) => a + b, 0) / 1000).toFixed(1);
+            const savedCost = Math.round(totalSolarKwh * 5.8); // 5.8 NTD/kWh peak rate
+            const savedCostEl = document.getElementById('savedCostText');
+            if (savedCostEl) savedCostEl.innerText = `NT$ ${savedCost}`;
+
+            const selfUseRate = Math.min(100, Math.round((loadCurve.reduce((a, b) => a + b, 0) / (solarCurve.reduce((a, b) => a + b, 0) || 1)) * 100));
+            const selfUseEl = document.getElementById('selfUseRateText');
+            if (selfUseEl) selfUseEl.innerText = `${selfUseRate}%`;
+        }
+
+        function openScheduleModal() {
+            document.getElementById('scheduleModal').classList.remove('hidden');
+        }
+        function closeScheduleModal() {
+            document.getElementById('scheduleModal').classList.add('hidden');
+        }
+        function saveNewSchedule(e) {
+            e.preventDefault();
+            const title = document.getElementById('schedTitle').value;
+            const targetHour = parseInt(document.getElementById('schedTargetHour').value);
+            const startHour = parseInt(document.getElementById('schedStartHour').value);
+            const device = document.getElementById('schedDevice').value;
+            const power = parseInt(document.getElementById('schedPower').value);
+
+            schedules.push({
+                id: Date.now(),
+                title: title,
+                targetHour: targetHour,
+                startHour: startHour,
+                device: device,
+                power: power,
+                active: true
+            });
+
+            closeScheduleModal();
+            renderScheduleList();
+            runSimulation();
+        }
+
+        function openRealFeelModal() {
+            document.getElementById('realFeelModal').classList.remove('hidden');
+        }
+        function closeRealFeelModal() {
+            document.getElementById('realFeelModal').classList.add('hidden');
+        }
+        function saveRealFeel(e) {
+            e.preventDefault();
+            realFeelData.temp = parseInt(document.getElementById('realFeelTempInput').value);
+            realFeelData.sun = document.getElementById('realFeelSunInput').value;
+            realFeelData.comfort = document.getElementById('realFeelComfortInput').value;
+            realFeelData.active = true;
+
+            document.getElementById('realFeelBadge').classList.remove('hidden');
+            closeRealFeelModal();
+            runSimulation();
+        }
+        function clearRealFeel() {
+            realFeelData.active = false;
+            document.getElementById('realFeelBadge').classList.add('hidden');
+            closeRealFeelModal();
+            runSimulation();
+        }
+
+        function openCwaModal() {
+            document.getElementById('cwaModal').classList.remove('hidden');
+        }
+        function closeCwaModal() {
+            document.getElementById('cwaModal').classList.add('hidden');
+        }
+        function saveCwaKey() {
+            cwaApiKey = document.getElementById('cwaKeyInput').value;
+            alert('已成功儲存中央氣象署 API Key！');
+            closeCwaModal();
+        }
+
+        // Attach global scope window handlers to prevent inline call errors
+        window.initChart = initChart;
+        window.startRealTimeClock = startRealTimeClock;
+        window.toggleLiveSync = toggleLiveSync;
+        window.updateHourDisplay = updateHourDisplay;
+        window.getUserGPSLocation = getUserGPSLocation;
+        window.fetchRealWeather = fetchRealWeather;
+        window.onCityChange = onCityChange;
+        window.render7DayForecast = render7DayForecast;
+        window.selectForecastDay = selectForecastDay;
+        window.renderScheduleList = renderScheduleList;
+        window.toggleSchedule = toggleSchedule;
+        window.deleteSchedule = deleteSchedule;
+        window.runSimulation = runSimulation;
+        window.openScheduleModal = openScheduleModal;
+        window.closeScheduleModal = closeScheduleModal;
+        window.saveNewSchedule = saveNewSchedule;
+        window.openRealFeelModal = openRealFeelModal;
+        window.closeRealFeelModal = closeRealFeelModal;
+        window.saveRealFeel = saveRealFeel;
+        window.clearRealFeel = clearRealFeel;
+        window.openCwaModal = openCwaModal;
+        window.closeCwaModal = closeCwaModal;
+        window.saveCwaKey = saveCwaKey;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            renderScheduleList();
+            startRealTimeClock();
+
+            const currentHour = new Date().getHours();
+            const slider = document.getElementById('hourRange');
+            if (slider) {
+                slider.value = currentHour;
+                slider.addEventListener('input', (e) => {
+                    const hour = parseInt(e.target.value);
+                    if (hour !== new Date().getHours()) {
+                        toggleLiveSync(false);
+                    }
+                    updateHourDisplay(hour, isLiveTimeMode);
+                    runSimulation();
+                });
+            }
+            updateHourDisplay(currentHour, true);
+
+            fetchRealWeather();
+        });
+    </script>
+</body>
+</html>
